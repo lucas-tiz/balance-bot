@@ -1,0 +1,385 @@
+//*****************************************************************************
+//
+// MSP432 main.c - IMU
+//
+//****************************************************************************
+
+/*TODO:
+ * interrupt routine priority
+ * error checking on start-up
+ * simplify update IMU functions
+ * add delay for IMU power up
+ * calibrate accelerometer
+ *
+ */
+
+#include "i2c_lucas.h"
+#include "mpu6050.h"
+
+#include <stdio.h>
+#include <stdbool.h>
+#include <math.h>
+#include "msp.h"
+#include "driverlib.h"
+
+// constants
+#define PI 3.142  // pi
+
+// LED macros
+#define LED_OFF 0
+#define LED_RED 1
+#define LED_GREEN 2
+#define LED_BLUE 3
+
+#define IMU_CAL_CYCLES 400          // calibration cycles
+
+
+// timing values
+#define CLOCK_FREQ 48E+6            // (Hz) DCO clock frequency
+#define IMU_CALC_FREQ 200           // (Hz) frequency at which IMU position calculations are made
+
+
+// configure UART to 38400 baud rate
+const eUSCI_UART_Config uartConfig =
+{    EUSCI_A_UART_CLOCKSOURCE_SMCLK,                // clock source
+     19,                                            // clock prescalar
+     8,                                             // first mod reg
+     85,                                           // second mod reg
+     EUSCI_A_UART_NO_PARITY,                        // no parity
+     EUSCI_A_UART_LSB_FIRST,                        // LSB first
+     EUSCI_A_UART_ONE_STOP_BIT,                     // one stop bit
+     EUSCI_A_UART_MODE,                             // UART mode
+     EUSCI_A_UART_OVERSAMPLING_BAUDRATE_GENERATION  // oversampling on
+};
+
+// configure timer: ? Hz TODO
+const Timer_A_UpModeConfig upConfig_0 = // configure timer A in up mode
+{   TIMER_A_CLOCKSOURCE_SMCLK,          // tie timer A to SMCLK
+    0x01,                               // clock source divider
+    65000,                              // period of timer A
+    TIMER_A_TAIE_INTERRUPT_DISABLE,     // disable timer A rollover interrupt
+    TIMER_A_CCIE_CCR0_INTERRUPT_ENABLE, // enable capture compare interrupt
+    TIMER_A_DO_CLEAR                    // clear counter upon initialization
+};
+
+// configure timer: sensor read, 200 Hz
+const Timer_A_UpModeConfig timerSensorConfig = // configure timer A in up mode
+{   TIMER_A_CLOCKSOURCE_SMCLK,          // tie timer A to SMCLK
+    0x01,                               // clock source divider
+    (12E+6)/IMU_CALC_FREQ,              // period of timer
+    TIMER_A_TAIE_INTERRUPT_DISABLE,     // disable timer A rollover interrupt
+    TIMER_A_CCIE_CCR0_INTERRUPT_ENABLE, // enable capture compare interrupt
+    TIMER_A_DO_CLEAR                    // clear counter upon initialization
+};
+
+// configure timer to measure elapsed time between gyro reads
+const Timer_A_UpModeConfig timerGyroRead = // configure timer A in up mode
+{   TIMER_A_CLOCKSOURCE_SMCLK,          // tie timer A to SMCLK
+    0x02,                               // 2 clock source divider
+    65535,                              // period of timer
+    TIMER_A_TAIE_INTERRUPT_DISABLE,     // disable timer A rollover interrupt
+    TIMER_A_CCIE_CCR0_INTERRUPT_DISABLE,// enable capture compare interrupt
+    TIMER_A_DO_CLEAR                    // clear counter upon initialization
+};
+
+
+// global variables
+volatile float accelRawData[3][2]; // x-,y-,z- raw acceleration data
+volatile float gyroRawData[3][2]; // x-,y-,z- raw gyro data
+volatile float gyroIntTime; // gyro integration time
+float gyroRawOffset[3] = {0, 0, 0}; // raw gyro offsets
+
+volatile float pitchGyro = 0;   // x-axis of MPU
+volatile float pitchAccel;      // x-axis of MPU
+volatile float pitchCompFilter; // pitch computed with complementary filter
+volatile float yawGyro = 0;     // y-axis of MPU
+volatile float rollGyro = 0;    // z-axis of MPU
+volatile float rollAccel;       // z-axis of MPU
+volatile float dataVec[9];      // vector of data to send via UART
+
+// flags
+bool imuUpdateFlag = 0;
+bool transmitDataFlag = 0;
+
+// function prototypes
+void I2C_Init(void);
+void IMU_Calibrate(void);
+void calcAccelOrient(float* accel, float* angles);
+void calculateOrient(void);
+void transmitData(void);
+
+void TA0_0_IRQHandler(void);
+void TA1_0_IRQHandler(void);
+void ledControl2(int state);
+void delayMs(int n);
+
+
+void main(void)
+{
+    MAP_WDT_A_holdTimer(); // hold the watchdog timer (stop from running)
+    MAP_Interrupt_disableMaster(); // disable interrupts
+
+    // set up clocks
+    MAP_FlashCtl_setWaitState(FLASH_BANK0, 1); // flash wait state required for 48 MHz frequency
+    MAP_FlashCtl_setWaitState(FLASH_BANK1, 1); // flash wait state required for 48 MHz frequency
+    MAP_CS_setDCOFrequency(48E+6); // set DCO clock source frequency to 48 MHz
+    MAP_CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_4);  // tie SMCLK to DCO, 4 divider
+
+    // configure LEDs
+    MAP_GPIO_setAsOutputPin(GPIO_PORT_P1, GPIO_PIN0);
+    MAP_GPIO_setOutputLowOnPin(GPIO_PORT_P1, GPIO_PIN0);
+    MAP_GPIO_setAsOutputPin(GPIO_PORT_P2, GPIO_PIN0 | GPIO_PIN1 |GPIO_PIN2);
+    MAP_GPIO_setOutputLowOnPin(GPIO_PORT_P2, GPIO_PIN0| GPIO_PIN1 |GPIO_PIN2);
+
+    // set up I2C
+    I2C_Init();
+
+    // set up UART
+    MAP_GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P1, (GPIO_PIN2 | GPIO_PIN3), GPIO_PRIMARY_MODULE_FUNCTION); // set pins P1.2 and P1.3 to UART mode
+    MAP_UART_initModule(EUSCI_A0_BASE, &uartConfig); // configure UART module instance A0
+    MAP_UART_enableModule(EUSCI_A0_BASE); // enable UART module instance A0
+
+    // set up timers
+    MAP_Timer_A_configureUpMode(TIMER_A0_BASE, &upConfig_0);  // configure timer A0 using above struct
+    MAP_Timer_A_configureUpMode(TIMER_A1_BASE, &timerSensorConfig);  // configure timer A1 as sensor timer
+    MAP_Timer_A_configureUpMode(TIMER_A2_BASE, &timerGyroRead); // configure timer A2 to count elapsed gyro read time
+    MAP_Interrupt_enableInterrupt(INT_TA0_0);   // enable timer interrupt on NVIC module
+    MAP_Interrupt_enableInterrupt(INT_TA1_0);   // enable timer interrupt on NVIC module
+    MAP_Timer_A_clearCaptureCompareInterrupt(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_0); // clear timer A0 interrupt flags
+    MAP_Timer_A_clearCaptureCompareInterrupt(TIMER_A1_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_0); // clear timer A1 interrupt flags
+    MAP_Timer_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);  // start timer A0
+    MAP_Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);  // start timer A1
+    MAP_Timer_A_startCounter(TIMER_A2_BASE, TIMER_A_UP_MODE);  // start timer A2
+
+    // start
+    delayMs(100); // delay to let IMU power up
+    MAP_Interrupt_enableMaster(); // enable interrupts
+
+    ledControl2(LED_RED);
+    IMU_Init(44, 1000, 2);   // initialize IMU
+    ledControl2(LED_OFF);
+
+    ledControl2(LED_BLUE);
+    IMU_Calibrate(); // calibrate IMU
+    ledControl2(LED_OFF);
+
+    while(1) {
+        if (imuUpdateFlag == 1) {
+            imuUpdateFlag = 0;  // clear IMU update flag
+        }
+        if (transmitDataFlag == 1) {
+            transmitData();
+            transmitDataFlag = 0;
+        }
+        //TODO: add recalibration option
+    }
+}
+
+
+void I2C_Init(void) {
+    /* initialize I2C module 1 */
+    EUSCI_B1->CTLW0 |= 1;       // disable UCB1 during configuration
+    EUSCI_B1->CTLW0 = 0x0F81;   // 7-bit slave address, master, I2C, synch mode, use SMCLK
+    EUSCI_B1->BRW = 0x1E;       // set clock prescaler to get 400kHz baud rate
+    P6->SEL0 |= 0x30;           // configure P6.4, P6.5 for UCB1: set register bits 4 & 5
+    P6->SEL1 &= ~0x30;          // configure P6.4, P6.5 for UCB1: clear register bits 4 & 5
+    EUSCI_B1->CTLW0 &= ~1;      // enable UCB1 after configuration
+}
+
+
+
+
+
+
+void calcAccelOrient(float* accel, float* angles) {
+    float aX = accel[0];
+    float aY = accel[1];
+    float aZ = accel[2];
+
+    angles[0] = -atan2(aZ, (aY/fabs(aY))*sqrt(pow(aX,2) + pow(aY,2)))*(180.0/PI);
+    angles[1] = -atan2(-aX, aY)*(180.0/PI); // (role is about z-axis)
+}
+
+
+void calculateOrient(void) {
+    /* calculate orientation based on IMU data */
+    //TODO: implement yaw, roll later if necessary
+
+    float aX = accelRawData[0][0];
+    float aY = accelRawData[1][0];
+    float aZ = accelRawData[2][0];
+    float gX = gyroRawData[0][0];
+    float gY = gyroRawData[1][0];
+    float gZ = gyroRawData[2][0];
+
+    // calculate pitch from gyro data
+    if (gX >= GYRO_THRESHOLD || gX <= -GYRO_THRESHOLD) { // check gyro angular velocity threshold
+        pitchGyro = pitchGyro + ((gX+gyroRawData[0][1])/2.0)*(1.0/(float)IMU_CALC_FREQ);
+//        pitchGyro = pitchGyro + gyroRawData[0][1]*(0.005);
+    }
+
+
+    // calculate pitch and roll from accelerometer data
+    pitchAccel = -atan2(aZ, (aY/fabs(aY))*sqrt(pow(aX,2) + pow(aY,2)))*(180.0/PI);
+    rollAccel = -atan2(-aX, aY)*(180.0/PI); // (role is about z-axis)
+
+    // correct drift of gyro
+    pitchGyro = pitchGyro*0.9996 + pitchAccel*0.0004;
+
+    // combine gyro and accelerometer data
+    pitchCompFilter = 0.90*pitchGyro + 0.10*pitchAccel; // calculate complementary filtered pitch
+
+    // update data vector
+    dataVec[0] = aX;
+    dataVec[1] = aY;
+    dataVec[2] = aZ;
+    dataVec[3] = gX;
+    dataVec[4] = gY;
+    dataVec[5] = gZ;
+
+    dataVec[6] = pitchGyro;
+    dataVec[7] = pitchAccel;
+    dataVec[8] = pitchCompFilter;
+}
+
+
+//void IMU_Calibrate(void) {
+//    /* initialize gyro values based on accelerometer values: must be stationary */
+//    ledControl2(LED_BLUE);
+//
+//    float accelCalData[IMU_CAL_CYCLES][3];   // use average of this data to estimate initial angles
+//    float gyroCalData[IMU_CAL_CYCLES][3];    // use average of this data to estimate gyro offsets
+//
+//    int calCount = 0; // zero calibration count
+//    int axis; // coordinate frame axis
+//    while (calCount < IMU_CAL_CYCLES) {
+//        if (imuUpdateFlag == 1) {
+//            for(axis = 0; axis < 3; axis++) {
+//                accelCalData[calCount][axis] = accelRawData[axis][0];  // record acceleration data
+//                gyroCalData[calCount][axis] = gyroRawData[axis][0];    // record gyro data
+//            }
+//            imuUpdateFlag = 0;  // clear IMU update flag
+//            calCount++;         // increment calibration sample count
+//        }
+//    }
+//
+//    // calculate average value for each axis of accelerometer and gyro
+//    float accelCalAvg[3] = {0,0,0};
+//    float gyroCalAvg[3] = {0,0,0};
+//    for(axis = 0; axis < 3; axis++) {
+//        for (calCount = 0; calCount < IMU_CAL_CYCLES; calCount++) {
+//            accelCalAvg[axis] = accelCalAvg[axis] + accelCalData[calCount][axis];
+//            gyroCalAvg[axis] = gyroCalAvg[axis] + gyroCalData[calCount][axis];
+//        }
+//        accelCalAvg[axis] = accelCalAvg[axis]/IMU_CAL_CYCLES; // calculate average accelerations
+//        gyroRawOffset[axis] = gyroCalAvg[axis]/IMU_CAL_CYCLES; // set gyro offset to average
+//    }
+//    float angles[3];
+//    calcAccelOrient(accelCalAvg, angles); // calculate orientation from average accelerations
+//    pitchGyro = angles[0]; // zero gyro pitch based on accelerometer
+//    rollGyro = angles[2]; // zero gyro roll based on accelerometer
+//
+//    ledControl2(LED_OFF);
+//}
+
+
+
+
+//////////////////// UART data transmission ////////////////////
+void transmitData(void) {
+    /* transmit float data over UART */
+    int i,j;
+    char str[13];
+    for (i = 0; i < 9; i++) { // loop over data in data vector
+        sprintf(str, "%6.6f", dataVec[i]); // convert data float to string
+
+        for (j = 0; j < 6; j++) { // loop over characters in data
+            MAP_UART_transmitData(EUSCI_A0_BASE, str[j]); // transmit digit in data string
+            while (MAP_UART_getInterruptStatus(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT_FLAG) != EUSCI_A_UART_TRANSMIT_INTERRUPT_FLAG); // wait for transmit buffer empty
+        }
+        MAP_UART_transmitData(EUSCI_A0_BASE, 0x20); // transmit space between vector values
+        while (MAP_UART_getInterruptStatus(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT_FLAG) != EUSCI_A_UART_TRANSMIT_INTERRUPT_FLAG); // wait for transmit buffer empty
+    }
+    MAP_UART_transmitData(EUSCI_A0_BASE, 0x0D); // transmit carriage return between data sets
+    while (MAP_UART_getInterruptStatus(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT_FLAG) != EUSCI_A_UART_TRANSMIT_INTERRUPT_FLAG); // wait for transmit buffer empty
+    MAP_UART_transmitData(EUSCI_A0_BASE, 0x0A); // transmit new line between data sets
+    while (MAP_UART_getInterruptStatus(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT_FLAG) != EUSCI_A_UART_TRANSMIT_INTERRUPT_FLAG); // wait for transmit buffer empty
+}
+
+
+
+
+
+//////////////////// interrupts ////////////////////
+void TA0_0_IRQHandler(void) {
+    /* timer 0 interrupt routine*/
+    MAP_Interrupt_disableMaster(); // disable interrupts
+
+    //TODO: implement controller here?
+
+    MAP_Timer_A_clearCaptureCompareInterrupt(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_0); // clear interrupt flag
+    MAP_Interrupt_enableMaster(); // enable interrupts
+}
+
+
+void TA1_0_IRQHandler(void) {
+    /* timer 1 interrupt routine: read sensors*/
+    MAP_Interrupt_disableMaster(); // disable interrupts
+    static int count;
+
+    IMU_ReadVals();     // update values from IMU
+    calculateOrient();  // calculate IMU orientation
+
+    count++; // increment data transmission counter
+    imuUpdateFlag = 1; // raise  IMU update flag
+
+    // transmit data at 20 Hz
+    if (count == 10)
+    {
+        transmitDataFlag = 1;
+        count = 0;
+    }
+
+    MAP_Timer_A_clearCaptureCompareInterrupt(TIMER_A1_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_0); // clear interrupt flag
+    MAP_Interrupt_enableMaster(); // enable interrupts
+}
+
+
+//////////////////// utility functions ////////////////////
+void ledControl2(int state) {
+    /* LED2 state: 0 = OFF, 1 = RED, 2 = GREEN, 3 = BLUE */
+    MAP_GPIO_setOutputLowOnPin(GPIO_PORT_P2, GPIO_PIN0 | GPIO_PIN1 | GPIO_PIN2); // turn all off
+
+    switch (state) {
+        case 0:
+            break;
+        case 1:
+            MAP_GPIO_setOutputHighOnPin(GPIO_PORT_P2, GPIO_PIN0);
+            break;
+        case 2:
+            MAP_GPIO_setOutputHighOnPin(GPIO_PORT_P2, GPIO_PIN1);
+            break;
+        case 3:
+            MAP_GPIO_setOutputHighOnPin(GPIO_PORT_P2, GPIO_PIN2);
+            break;
+    }
+}
+
+
+void delayMs(int n) {
+    /* millisecond delay for 48 MHz clock */
+    int i, j;
+
+    for (j = 0; j < n; j++){
+        for (i = 4000; i > 0; i--); // delay 1 ms
+    }
+}
+
+
+
+
+
+
+
+
+
