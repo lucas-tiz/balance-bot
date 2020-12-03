@@ -2,7 +2,9 @@
 # Automatically-generated file. Do not edit!
 ################################################################################
 
-CG_TOOL_ROOT := /opt/ti/ccsv8/tools/compiler/ti-cgt-arm_18.1.4.LTS
+SHELL = cmd.exe
+
+CG_TOOL_ROOT := C:/ti/ccsv8/tools/compiler/ti-cgt-arm_18.1.5.LTS
 
 GEN_OPTS__FLAG := 
 GEN_CMDS__FLAG := 
@@ -53,8 +55,8 @@ $(GEN_CMDS__FLAG) \
 
 -include ../makefile.init
 
-RM := rm -rf
-RMDIR := rm -rf
+RM := DEL /F
+RMDIR := RMDIR /S/Q
 
 # All of the sources participating in the build are defined here
 -include sources.mk
@@ -186,22 +188,22 @@ all: $(OBJS) $(CMD_SRCS) $(LIB_SRCS) $(A_SRCS) $(GEN_CMDS)
 balance-bot.out: $(OBJS) $(CMD_SRCS) $(LIB_SRCS) $(A_SRCS) $(GEN_CMDS)
 	@echo 'Building target: "$@"'
 	@echo 'Invoking: ARM Linker'
-	"/opt/ti/ccsv8/tools/compiler/ti-cgt-arm_18.1.4.LTS/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 -me --advice:power=all --define=__MSP432P401R__ --define=ccs -g --gcc --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi -z -m"balance-bot.map" --heap_size=1024 --stack_size=512 -i"/opt/ti/ccsv8/ccs_base/arm/include" -i"/opt/ti/ccsv8/tools/compiler/ti-cgt-arm_18.1.4.LTS/lib" -i"/opt/ti/ccsv8/tools/compiler/ti-cgt-arm_18.1.4.LTS/include" --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info="balance-bot_linkInfo.xml" --rom_model -o "balance-bot.out" $(ORDERED_OBJS) $(A_SRCS)
+	"C:/ti/ccsv8/tools/compiler/ti-cgt-arm_18.1.5.LTS/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 -me --advice:power=all --define=__MSP432P401R__ --define=ccs -g --gcc --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi -z -m"balance-bot.map" --heap_size=1024 --stack_size=512 -i"C:/ti/ccsv8/ccs_base/arm/include" -i"C:/ti/ccsv8/tools/compiler/ti-cgt-arm_18.1.5.LTS/lib" -i"C:/ti/ccsv8/tools/compiler/ti-cgt-arm_18.1.5.LTS/include" --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info="balance-bot_linkInfo.xml" --rom_model -o "balance-bot.out" $(ORDERED_OBJS) $(A_SRCS)
 	@echo 'Finished building target: "$@"'
 	@echo ' '
 
 balance-bot.hex: $(EXE_OUTPUTS)
 	@echo 'Building files: $(strip $(EXE_OUTPUTS__QUOTED))'
 	@echo 'Invoking: ARM Hex Utility'
-	"/opt/ti/ccsv8/tools/compiler/ti-cgt-arm_18.1.4.LTS/bin/armhex" --memwidth=8 --romwidth=8 -o "balance-bot.hex" $(EXE_OUTPUTS__QUOTED)
+	"C:/ti/ccsv8/tools/compiler/ti-cgt-arm_18.1.5.LTS/bin/armhex" --memwidth=8 --romwidth=8 -o "balance-bot.hex" $(EXE_OUTPUTS__QUOTED)
 	@echo 'Finished building: $(strip $(EXE_OUTPUTS__QUOTED))'
 	@echo ' '
 
 # Other Targets
 clean:
 	-$(RM) $(BIN_OUTPUTS__QUOTED)$(EXE_OUTPUTS__QUOTED)
-	-$(RM) "control.obj" "encoder.obj" "i2c_lt.obj" "init.obj" "interrupts.obj" "main.obj" "mpu6050.obj" "startup_msp432p401r_ccs.obj" "system_msp432p401r.obj" "uart_lt.obj" "util.obj" "driverlib/MSP432P4xx/adc14.obj" "driverlib/MSP432P4xx/aes256.obj" "driverlib/MSP432P4xx/comp_e.obj" "driverlib/MSP432P4xx/cpu.obj" "driverlib/MSP432P4xx/crc32.obj" "driverlib/MSP432P4xx/cs.obj" "driverlib/MSP432P4xx/dma.obj" "driverlib/MSP432P4xx/flash.obj" "driverlib/MSP432P4xx/fpu.obj" "driverlib/MSP432P4xx/gpio.obj" "driverlib/MSP432P4xx/i2c.obj" "driverlib/MSP432P4xx/interrupt.obj" "driverlib/MSP432P4xx/mpu.obj" "driverlib/MSP432P4xx/pcm.obj" "driverlib/MSP432P4xx/pmap.obj" "driverlib/MSP432P4xx/pss.obj" "driverlib/MSP432P4xx/ref_a.obj" "driverlib/MSP432P4xx/reset.obj" "driverlib/MSP432P4xx/rtc_c.obj" "driverlib/MSP432P4xx/spi.obj" "driverlib/MSP432P4xx/sysctl.obj" "driverlib/MSP432P4xx/systick.obj" "driverlib/MSP432P4xx/timer32.obj" "driverlib/MSP432P4xx/timer_a.obj" "driverlib/MSP432P4xx/uart.obj" "driverlib/MSP432P4xx/wdt_a.obj" 
-	-$(RM) "control.d" "encoder.d" "i2c_lt.d" "init.d" "interrupts.d" "main.d" "mpu6050.d" "startup_msp432p401r_ccs.d" "system_msp432p401r.d" "uart_lt.d" "util.d" "driverlib/MSP432P4xx/adc14.d" "driverlib/MSP432P4xx/aes256.d" "driverlib/MSP432P4xx/comp_e.d" "driverlib/MSP432P4xx/cpu.d" "driverlib/MSP432P4xx/crc32.d" "driverlib/MSP432P4xx/cs.d" "driverlib/MSP432P4xx/dma.d" "driverlib/MSP432P4xx/flash.d" "driverlib/MSP432P4xx/fpu.d" "driverlib/MSP432P4xx/gpio.d" "driverlib/MSP432P4xx/i2c.d" "driverlib/MSP432P4xx/interrupt.d" "driverlib/MSP432P4xx/mpu.d" "driverlib/MSP432P4xx/pcm.d" "driverlib/MSP432P4xx/pmap.d" "driverlib/MSP432P4xx/pss.d" "driverlib/MSP432P4xx/ref_a.d" "driverlib/MSP432P4xx/reset.d" "driverlib/MSP432P4xx/rtc_c.d" "driverlib/MSP432P4xx/spi.d" "driverlib/MSP432P4xx/sysctl.d" "driverlib/MSP432P4xx/systick.d" "driverlib/MSP432P4xx/timer32.d" "driverlib/MSP432P4xx/timer_a.d" "driverlib/MSP432P4xx/uart.d" "driverlib/MSP432P4xx/wdt_a.d" 
+	-$(RM) "control.obj" "encoder.obj" "i2c_lt.obj" "init.obj" "interrupts.obj" "main.obj" "mpu6050.obj" "startup_msp432p401r_ccs.obj" "system_msp432p401r.obj" "uart_lt.obj" "util.obj" "driverlib\MSP432P4xx\adc14.obj" "driverlib\MSP432P4xx\aes256.obj" "driverlib\MSP432P4xx\comp_e.obj" "driverlib\MSP432P4xx\cpu.obj" "driverlib\MSP432P4xx\crc32.obj" "driverlib\MSP432P4xx\cs.obj" "driverlib\MSP432P4xx\dma.obj" "driverlib\MSP432P4xx\flash.obj" "driverlib\MSP432P4xx\fpu.obj" "driverlib\MSP432P4xx\gpio.obj" "driverlib\MSP432P4xx\i2c.obj" "driverlib\MSP432P4xx\interrupt.obj" "driverlib\MSP432P4xx\mpu.obj" "driverlib\MSP432P4xx\pcm.obj" "driverlib\MSP432P4xx\pmap.obj" "driverlib\MSP432P4xx\pss.obj" "driverlib\MSP432P4xx\ref_a.obj" "driverlib\MSP432P4xx\reset.obj" "driverlib\MSP432P4xx\rtc_c.obj" "driverlib\MSP432P4xx\spi.obj" "driverlib\MSP432P4xx\sysctl.obj" "driverlib\MSP432P4xx\systick.obj" "driverlib\MSP432P4xx\timer32.obj" "driverlib\MSP432P4xx\timer_a.obj" "driverlib\MSP432P4xx\uart.obj" "driverlib\MSP432P4xx\wdt_a.obj" 
+	-$(RM) "control.d" "encoder.d" "i2c_lt.d" "init.d" "interrupts.d" "main.d" "mpu6050.d" "startup_msp432p401r_ccs.d" "system_msp432p401r.d" "uart_lt.d" "util.d" "driverlib\MSP432P4xx\adc14.d" "driverlib\MSP432P4xx\aes256.d" "driverlib\MSP432P4xx\comp_e.d" "driverlib\MSP432P4xx\cpu.d" "driverlib\MSP432P4xx\crc32.d" "driverlib\MSP432P4xx\cs.d" "driverlib\MSP432P4xx\dma.d" "driverlib\MSP432P4xx\flash.d" "driverlib\MSP432P4xx\fpu.d" "driverlib\MSP432P4xx\gpio.d" "driverlib\MSP432P4xx\i2c.d" "driverlib\MSP432P4xx\interrupt.d" "driverlib\MSP432P4xx\mpu.d" "driverlib\MSP432P4xx\pcm.d" "driverlib\MSP432P4xx\pmap.d" "driverlib\MSP432P4xx\pss.d" "driverlib\MSP432P4xx\ref_a.d" "driverlib\MSP432P4xx\reset.d" "driverlib\MSP432P4xx\rtc_c.d" "driverlib\MSP432P4xx\spi.d" "driverlib\MSP432P4xx\sysctl.d" "driverlib\MSP432P4xx\systick.d" "driverlib\MSP432P4xx\timer32.d" "driverlib\MSP432P4xx\timer_a.d" "driverlib\MSP432P4xx\uart.d" "driverlib\MSP432P4xx\wdt_a.d" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

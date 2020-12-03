@@ -1,8 +1,13 @@
-//*****************************************************************************
-//
-// MSP432 main.c - IMU
-//
-//****************************************************************************
+/**
+ * @file main.c
+ * @brief Balance two-wheeled robot
+ *
+ * Stabilize two-wheeled balancing robot in upright orientation
+ *
+ * @author Lucas Tiziani
+ * @date 2020-12-01
+ *
+ */
 
 /*TODO:
  * check interrupt durations on scope
@@ -12,13 +17,69 @@
  *
  */
 
-#include "init.h"
+
+/* Header files */
+#include "control.h"
+#include "encoder.h"
+#include "i2c_lt.h"
+#include "interrupts.h"
+#include "mpu6050.h"
+#include "uart_lt.h"
+#include "util.h"
+
+#include "msp.h"
+#include "driverlib.h"
+#include <stdbool.h>
+#include <stdio.h>
 
 
-// global variables
+/* Macros */
+#define NDEBUG 1
+
+// clocks
+//#define DCO_FREQ 48E+6  // clock frequency
+#define SMCLK_DIV CS_CLOCK_DIVIDER_4     // subsystem master clock divider
+#define SMCLK_FREQ DCO_FREQ/4   // subsystem master clock frequency
+
+// timers
+#define IMU_CALC_FREQ 100.0       // (Hz) frequency of IMU position calculations
+#define ENC_CALC_FREQ 100.0       // (Hz) frequency at which encoder angles are calculated
+#define CONTROL_FREQ 100.0        // (Hz) control update frequency
+#define MOTOR_FREQ 1000         // motor PWM timer frequency
+#define MOTOR_PERIOD SMCLK_FREQ/MOTOR_FREQ // motor PWM timer period
+
+// encoder ports/pins
+#define ENC_0_PORT GPIO_PORT_P3     // encoder 0 port
+#define ENC_0_CH_A_PIN GPIO_PIN2    // encoder 0 channel A pin
+#define ENC_0_CH_B_PIN GPIO_PIN3    // encoder 0 channel B pin
+#define ENC_1_PORT GPIO_PORT_P3     // encoder 1 port
+#define ENC_1_CH_A_PIN GPIO_PIN6    // encoder 1 channel A pin
+#define ENC_1_CH_B_PIN GPIO_PIN7    // encoder 1 channel B pin
+
+// motor pins/registers
+#define MOTOR_RF_PIN GPIO_PIN4  // right motor forward pin (TA0.1 --> P2.4)
+#define MOTOR_RB_PIN GPIO_PIN5  // right motor backward pin (TA0.2 --> P2.5)
+#define MOTOR_LF_PIN GPIO_PIN7  // left motor forward pin (TA0.4 --> P2.7)
+#define MOTOR_LB_PIN GPIO_PIN6  // left motor backward pin (TA0.3 --> P2.6)
+#define MOTOR_RF_DUTY &TA0CCR1   // right motor forward duty cycle timer register (TA0.1 --> P2.4)
+#define MOTOR_RB_DUTY &TA0CCR2   // right motor backward duty cycle timer register (TA0.2 --> P2.5)
+#define MOTOR_LF_DUTY &TA0CCR4   // left motor forward duty cycle timer register (TA0.4 --> P2.7)
+#define MOTOR_LB_DUTY &TA0CCR3   // left motor backward duty cycle timer register (TA0.3 --> P2.6)
+
+// LEDs
+#define LED_OFF 0
+#define LED_RED 1
+#define LED_GREEN 2
+#define LED_BLUE 3
+
+
+
+/* Global variables */
 volatile struct imuStruct imu;  // imu struct
-volatile struct encStruct encR; // right wheel struct
-volatile struct encStruct encL; // left wheel struct
+volatile struct encStruct encR; // right encoder struct
+volatile struct encStruct encL; // left encoder struct
+struct motorStruct motorR; // right motor struct
+struct motorStruct motorL; // left motor struct
 
 struct motorStruct motorR = {               // right motor struct
     .pins = {MOTOR_RF_PIN, MOTOR_RB_PIN},   // motor pins (0=forward, 1=backward)
@@ -27,7 +88,6 @@ struct motorStruct motorR = {               // right motor struct
     .velPID = {.kP = 0.03,                  // motor velocity control proportional gain
                .kI = 0.005,                 // motor velocity control integral gain
                .kD = 0},};                  // motor velocity control derivative
-
 struct motorStruct motorL = {               // left motor struct
     .pins = {MOTOR_LF_PIN, MOTOR_LB_PIN},   // motor pins (0=forward, 1=backward)
     .duty = {MOTOR_LF_DUTY, MOTOR_LB_DUTY}, // duty cycle timer registers corresponding to pins
@@ -36,15 +96,17 @@ struct motorStruct motorL = {               // left motor struct
                .kI = 0.005,                     // motor velocity control integral gain
                .kD = 0},};                  // motor velocity control derivative
 
+volatile bool flag_imu_read = 0;
+volatile bool flag_transmit = 0;
+
+#ifndef NDEBUG
+    volatile bool flag_debug = 0;
+    volatile float debug = 0;
+#endif
 
 
 
 
-volatile bool imuUpdateFlag = 0;
-volatile bool transmitDataFlag = 0;
-
-volatile int debugFlag = 0;
-volatile float debugVar = 0;
 
 // prototypes
 float* recordData(void);
@@ -53,6 +115,20 @@ float* recordData(void);
 void main(void) {
     MAP_WDT_A_holdTimer(); // hold the watchdog timer (stop from running)
     MAP_Interrupt_disableMaster(); // disable interrupts
+
+    // Configure master and subsystem master clocks
+    MAP_FlashCtl_setWaitState(FLASH_BANK0, 2);
+    MAP_FlashCtl_setWaitState(FLASH_BANK1, 2);
+    MAP_PCM_setCoreVoltageLevel(PCM_VCORE1); // higher voltage level to support 48 MHz
+    MAP_CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_48);
+    MAP_CS_setDCOFrequency(48E+6);
+    MAP_CS_initClockSignal(CS_MCLK, CS_DCOCLK_SELECT, 1);
+    MAP_CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_4);
+
+
+
+
+
 
     // configure
     Clock_Config();     // configure clocks
