@@ -57,14 +57,14 @@
 #define ENC_1_CH_B_PIN GPIO_PIN7    // encoder 1 channel B pin
 
 // motor pins/registers
-#define MOTOR_RF_PIN GPIO_PIN4  // right motor forward pin (TA0.1 --> P2.4)
-#define MOTOR_RB_PIN GPIO_PIN5  // right motor backward pin (TA0.2 --> P2.5)
-#define MOTOR_LF_PIN GPIO_PIN7  // left motor forward pin (TA0.4 --> P2.7)
-#define MOTOR_LB_PIN GPIO_PIN6  // left motor backward pin (TA0.3 --> P2.6)
-#define MOTOR_RF_DUTY &TA0CCR1   // right motor forward duty cycle timer register (TA0.1 --> P2.4)
-#define MOTOR_RB_DUTY &TA0CCR2   // right motor backward duty cycle timer register (TA0.2 --> P2.5)
-#define MOTOR_LF_DUTY &TA0CCR4   // left motor forward duty cycle timer register (TA0.4 --> P2.7)
-#define MOTOR_LB_DUTY &TA0CCR3   // left motor backward duty cycle timer register (TA0.3 --> P2.6)
+#define MOTOR_RF_PIN GPIO_PIN4 // right motor forward pin   (TA0.1 --> P2.4)
+#define MOTOR_RB_PIN GPIO_PIN5 // right motor backward pin  (TA0.2 --> P2.5)
+#define MOTOR_LF_PIN GPIO_PIN7 // left motor forward pin    (TA0.4 --> P2.7)
+#define MOTOR_LB_PIN GPIO_PIN6 // left motor backward pin   (TA0.3 --> P2.6)
+#define MOTOR_RF_DUTY &TA0CCR1 // right motor for duty reg  (TA0.1 --> P2.4)
+#define MOTOR_RB_DUTY &TA0CCR2 // right motor back duty reg (TA0.2 --> P2.5)
+#define MOTOR_LF_DUTY &TA0CCR4 // left motor for duty reg   (TA0.4 --> P2.7)
+#define MOTOR_LB_DUTY &TA0CCR3 // left motor back duty reg  (TA0.3 --> P2.6)
 
 // LEDs
 #define LED_OFF 0
@@ -119,19 +119,42 @@ void main(void) {
     // Configure master and subsystem master clocks
     MAP_FlashCtl_setWaitState(FLASH_BANK0, 2);
     MAP_FlashCtl_setWaitState(FLASH_BANK1, 2);
-    MAP_PCM_setCoreVoltageLevel(PCM_VCORE1); // higher voltage level to support 48 MHz
+    MAP_PCM_setCoreVoltageLevel(PCM_VCORE1); // higher voltage level for 48 MHz
     MAP_CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_48);
     MAP_CS_setDCOFrequency(48E+6);
     MAP_CS_initClockSignal(CS_MCLK, CS_DCOCLK_SELECT, 1);
     MAP_CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_4);
 
+    // Configure motor PWM with Timer A0
+    MAP_GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, MOTOR_RF_PIN |
+        MOTOR_RB_PIN | MOTOR_LF_PIN | MOTOR_LB_PIN, GPIO_PRIMARY_MODULE_FUNCTION);
+    MAP_GPIO_setOutputLowOnPin(GPIO_PORT_P2, MOTOR_RF_PIN | MOTOR_RB_PIN |
+        MOTOR_LF_PIN | MOTOR_LB_PIN);
 
+    Timer_A_PWMConfig pwm_right_forward_config =
+    {   TIMER_A_CLOCKSOURCE_SMCLK,
+        TIMER_A_CLOCKSOURCE_DIVIDER_1,
+        MOTOR_PERIOD,
+        TIMER_A_CAPTURECOMPARE_REGISTER_1,
+        TIMER_A_OUTPUTMODE_RESET_SET,
+        0 // initial duty cycle
+    };
+    MAP_Timer_A_generatePWM(TIMER_A0_BASE, &pwm_right_forward_config); // TA0.1 --> P2.4
+
+    Timer_A_PWMConfig pwm_right_back_config =
+    {   TIMER_A_CLOCKSOURCE_SMCLK,
+        TIMER_A_CLOCKSOURCE_DIVIDER_1,
+        MOTOR_PERIOD,
+        TIMER_A_CAPTURECOMPARE_REGISTER_2,
+        TIMER_A_OUTPUTMODE_RESET_SET,
+        0 // initial duty cycle
+    };
+    MAP_Timer_A_generatePWM(TIMER_A0_BASE, &pwm_right_back_config); // TA0.2 --> P2.5
 
 
 
 
     // configure
-    Clock_Config();     // configure clocks
     LED1_Config();      // configure LED1
     LED2_Config();      // configure LED2
     I2C_Config();       // configure I2C

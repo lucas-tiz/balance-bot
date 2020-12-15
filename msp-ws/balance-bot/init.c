@@ -6,28 +6,28 @@
  */
 
 
-#include "init.h"
-
-
-void Clock_Config(void) {
-    /* configure master and subsystem master clocks */
-    MAP_FlashCtl_setWaitState(FLASH_BANK0, 1); // flash wait state required for 48 MHz frequency
-    MAP_FlashCtl_setWaitState(FLASH_BANK1, 1); // flash wait state required for 48 MHz frequency
-    MAP_CS_setDCOFrequency(DCO_FREQ); // set DCO clock source frequency to 48 MHz
-    MAP_CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, SMCLK_DIV);  // tie SMCLK to DCO, 4 divider
-}
+//#include "init.h"
+//
+//
+//void Clock_Config(void) {
+//    /* configure master and subsystem master clocks */
+//    MAP_FlashCtl_setWaitState(FLASH_BANK0, 1); // flash wait state required for 48 MHz frequency
+//    MAP_FlashCtl_setWaitState(FLASH_BANK1, 1); // flash wait state required for 48 MHz frequency
+//    MAP_CS_setDCOFrequency(DCO_FREQ); // set DCO clock source frequency to 48 MHz
+//    MAP_CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, SMCLK_DIV);  // tie SMCLK to DCO, 4 divider
+//}
 
 
 void TimerA0_Config(void) {
     /* configure timer A0 for motor PWM signals, 1kHz */    //TODO: play with frequency
-    MAP_GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, MOTOR_RF_PIN, GPIO_PRIMARY_MODULE_FUNCTION); // configure PWM pin (TA0.1 --> P2.4)
-    MAP_GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, MOTOR_RB_PIN, GPIO_PRIMARY_MODULE_FUNCTION); // configure PWM pin (TA0.2 --> P2.5)
-    MAP_GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, MOTOR_LF_PIN, GPIO_PRIMARY_MODULE_FUNCTION); // configure PWM pin (TA0.2 --> P2.6)
-    MAP_GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, MOTOR_LB_PIN, GPIO_PRIMARY_MODULE_FUNCTION); // configure PWM pin (TA0.2 --> P2.7)
-    MAP_GPIO_setOutputLowOnPin(GPIO_PORT_P2, MOTOR_RF_PIN); // set output low
-    MAP_GPIO_setOutputLowOnPin(GPIO_PORT_P2, MOTOR_RB_PIN); // set output low
-    MAP_GPIO_setOutputLowOnPin(GPIO_PORT_P2, MOTOR_LF_PIN); // set output low
-    MAP_GPIO_setOutputLowOnPin(GPIO_PORT_P2, MOTOR_LB_PIN); // set output low
+//    MAP_GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, MOTOR_RF_PIN, GPIO_PRIMARY_MODULE_FUNCTION); // configure PWM pin (TA0.1 --> P2.4)
+//    MAP_GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, MOTOR_RB_PIN, GPIO_PRIMARY_MODULE_FUNCTION); // configure PWM pin (TA0.2 --> P2.5)
+//    MAP_GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, MOTOR_LF_PIN, GPIO_PRIMARY_MODULE_FUNCTION); // configure PWM pin (TA0.2 --> P2.6)
+//    MAP_GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, MOTOR_LB_PIN, GPIO_PRIMARY_MODULE_FUNCTION); // configure PWM pin (TA0.2 --> P2.7)
+//    MAP_GPIO_setOutputLowOnPin(GPIO_PORT_P2, MOTOR_RF_PIN); // set output low
+//    MAP_GPIO_setOutputLowOnPin(GPIO_PORT_P2, MOTOR_RB_PIN); // set output low
+//    MAP_GPIO_setOutputLowOnPin(GPIO_PORT_P2, MOTOR_LF_PIN); // set output low
+//    MAP_GPIO_setOutputLowOnPin(GPIO_PORT_P2, MOTOR_LB_PIN); // set output low
 
     Timer_A_PWMConfig pwmRightForwardConfig =    // right forward PWM signal
     {   TIMER_A_CLOCKSOURCE_SMCLK,          // SMCLK clock source
