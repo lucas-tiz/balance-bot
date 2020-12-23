@@ -1,21 +1,27 @@
-/*
- * mpu6050.h
- *
- *  Created on: Jul 20, 2018
- *      Author: Lucas Tiziani
- */
+/**
+* @file mpu6050.h
+* @brief MPU-6050 IMU driver
+*
+* MPU-6050 gyro/accelerometer driver & processing
+*
+* @author Lucas Tiziani
+* @date 2020-12-19
+*
+*/
 
 #ifndef MPU6050_H_
 #define MPU6050_H_
 
-#include "init.h"
+
+#include "i2c_cust.h"
 #include <math.h>
 
-// IMU calibration variables
-#define GYRO_THRESHOLD 0.0          // (deg/s) gyro rotation threshold
-#define IMU_CAL_CYCLES 200          // number of calibration cycles over which to record data
 
-// IMU sensitivity values
+/* Macros */
+#define IMU_GYRO_THRESHOLD 0.0          // (deg/s) gyro rotation threshold
+#define IMU_CAL_CYCLES 200          // number of calibration cycles over which to record data
+#define IMU_CALC_FREQ 100.0       // (Hz) frequency of IMU position calculations
+
 #define IMU_GYRO_SENS_250 131.07    // (bits/deg/s) +/-250 deg/s gyro sensitivity
 #define IMU_GYRO_SENS_500 65.54     // (bits/deg/s) +/-500 deg/s gyro sensitivity
 #define IMU_GYRO_SENS_1000 32.77    // (bits/deg/s) +/-1000 deg/s gyro sensitivity
@@ -25,29 +31,29 @@
 #define IMU_ACCEL_SENS_8 4096.0     // (bits/g) +/-8g accelerometer sensitivity
 #define IMU_ACCEL_SENS_16 2048.0    // (bits/g) +/-16g accelerometer sensitivity
 
-// IMU registers
 #define IMU_ADDR 0x68               // I2C address
-#define IMU_PWR_MGMT_1 0x6B         // power management register 1
-#define IMU_CONFIG 0x1A             // IMU configuration (DLPF)
-#define IMU_GYRO_CONFIG 0x1B        // gyro configuration
-#define IMU_ACCEL_CONFIG 0x1C       // accelerometer configuration
-#define IMU_GRYO_XOUT1_REG 0x43     // first x-axis velocity data register
-#define IMU_ACCEL_XOUT1_REG 0x3B    // first x-axis accelerometer data register
 
-// constants
+#define IMU_REG_PWR_MGMT1 0x6B      // power management register 1
+#define IMU_REG_CONFIG 0x1A         // IMU configuration (DLPF)
+#define IMU_REG_GYRO_CONFIG 0x1B    // gyro configuration
+#define IMU_REG_ACCEL_CONFIG 0x1C   // accelerometer configuration
+#define IMU_REG_GRYO_XOUT1 0x43     // first x-axis velocity data register
+#define IMU_REG_ACCEL_XOUT1 0x3B    // first x-axis accelerometer data register
+
 #define PI 3.142  // pi
 
-// structures
-struct imuStruct {
+
+/* Data types */
+typedef struct {
     struct {
         float gyro;      // (bits/deg/s) gyro sensitivity
         float accel;     // (bits/g) accelerometer sensitivity
     } sens;
     struct {
-        float angVelOffset[3];  // (deg/s) gyro angular velocity offset
+        float ang_vel_offset[3];  // (deg/s) gyro angular velocity offset
     } cal;
     struct {
-        float angVel[3];    // (deg/s) angular velocity
+        float ang_vel[3];    // (deg/s) angular velocity
         float accel[3];     // (g) acceleration
     } raw;
     struct {
@@ -57,17 +63,18 @@ struct imuStruct {
     } angle;
     struct {
         float fused[3];           // (deg/s) angular velocity
-    } angVel;
-};
+    } ang_vel;
+} imu_t;
 
-// function prototypes
-void IMU_Init(volatile struct imuStruct* imu, int dlpfCutoff, int gyroRange, int accelRange);
-void IMU_ReadVals(volatile struct imuStruct* imu);
-void IMU_CalcAngleGyro(volatile float* angVel, volatile float* angle, float tInteg);
-void IMU_CalcAngleAccel(volatile float* accel, volatile float* angle);
-void IMU_CalcAngleFused(volatile struct imuStruct* imu);
-void IMU_Calibrate(volatile struct imuStruct* imu, int cycleDelay);
-void IMU_SelfTest(void);
+
+/* Function prototypes */
+void IMU_init(volatile imu_t * imu, int cutoff_dlpf, int range_gyro, int range_accel);
+void IMU_readVals(volatile imu_t * imu);
+void IMU_calcAngleGyro(volatile float * ang_vel, volatile float * angle, float t_integ);
+void IMU_calcAngleAccel(volatile float* accel, volatile float* angle);
+void IMU_calcAngleFused(volatile imu_t * imu);
+void IMU_calibrate(volatile imu_t * imu, int delay_cycle);
+void IMU_selfTest(void);
 
 
 #endif /* MPU6050_H_ */

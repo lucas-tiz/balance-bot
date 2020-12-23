@@ -1,0 +1,24 @@
+/**
+* @file i2c.h
+* @brief MSP432 I2C driver
+*
+* MSP432 I2C driver
+*
+* @author Lucas Tiziani
+* @date 2020-12-19
+*
+*/
+
+#ifndef I2C_LT_H_
+#define I2C_LT_H_
+
+#include "driverlib.h"
+#include <stdint.h>
+
+// function prototypes
+int I2C1_write(int addr_slave, unsigned char addr_mem, unsigned char data);
+int I2C1_read(int addr_slave, unsigned char addr_mem, unsigned char* data);
+int I2C1_burstRead2(int addr_lsave, unsigned char addr_mem, int count_byte, int16_t* data);
+
+
+#endif /*I2C_LUCAS_H_*/

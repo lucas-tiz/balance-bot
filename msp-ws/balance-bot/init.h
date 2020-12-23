@@ -5,8 +5,8 @@
  *      Author: Lucas Tiziani
  */
 
-#ifndef INIT_H_
-#define INIT_H_
+//#ifndef INIT_H_
+//#define INIT_H_
 
 
 //#include "control.h"
@@ -77,15 +77,15 @@
 
 
 // prototypes
-void Clock_Config(void);
-void TimerA0_Config(void);
-void TimerA1_Config(void);
-void LED1_Config(void);
-void LED2_Config(void);
-void I2C_Config(void);
-void UART_Config(void);
+//void Clock_Config(void);
+//void TimerA0_Config(void);
+//void TimerA1_Config(void);
+//void LED1_Config(void);
+//void LED2_Config(void);
+//void I2C_Config(void);
+//void UART_Config(void);
 
-void EncGPIO_Config(volatile struct encStruct* enc, uint8_t port, uint8_t pinA, uint8_t pinB);
+//void EncGPIO_Config(volatile struct encStruct* enc, uint8_t port, uint8_t pinA, uint8_t pinB);
 
 
-#endif /* INIT_H_ */
+//#endif /* INIT_H_ */

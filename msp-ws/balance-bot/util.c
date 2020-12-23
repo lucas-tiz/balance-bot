@@ -1,14 +1,19 @@
-/*
- * util.c
- *
- *  Created on: Jul 24, 2018
- *      Author: Lucas Tiziani
- */
+/**
+* @file util.c
+* @brief LED and delay utilities
+*
+* LED and delay utilities for MSP432
+*
+* @author Lucas Tiziani
+* @date 2020-12-19
+*
+*/
+
 
 #include "util.h"
 
 
-void LED2_Set(int state) {
+void LED2_set(int state) {
     /* LED2 state: 0 = OFF, 1 = RED, 2 = GREEN, 3 = BLUE */
 
     switch (state) {
@@ -28,11 +33,11 @@ void LED2_Set(int state) {
 }
 
 
-void delayMs(int clockFreq, int n) {
+void delayMs(int freq_clock, int n) {
     /* millisecond delay for 48 MHz clock */
     int i, j;
 
     for (j = 0; j < n; j++){
-        for (i = (clockFreq/HZ_PER_MS); i > 0; i--); // delay 1 ms
+        for (i = (freq_clock/HZ_PER_MS); i > 0; i--); // delay 1 ms
     }
 }
