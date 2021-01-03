@@ -13,8 +13,6 @@
 #define ENC_H_
 
 
-//#include "init.h"
-//#include "msp.h"
 #include "driverlib.h"
 #include <stdint.h>
 
@@ -28,20 +26,20 @@
 
 /* Data types */
 typedef struct {
-    uint8_t port;               // encoder port
-    uint8_t pins[ENC_NUM_CH];   // encoder pins corresponding to encoder channels
-    uint8_t state_prev;          // previous encoder state
-    int count;                  // encoder pulse count
-    float pos[2];               // (deg) wheel angle history (current and previous)
+    uint8_t port;             // encoder port
+    uint8_t pins[ENC_NUM_CH]; // encoder pins corresponding to encoder channels
+    volatile uint8_t state_prev;    // previous encoder state
+    volatile int count;             // encoder pulse count
+    float pos[2];                   // (deg) wheel angle history (current and previous)
     float vel[ENC_LPF_ORDER+1];     // (deg/s) wheel angular velocity history
-    float vel_filt;              // (deg/s) filtered wheel angular velocity
+    float vel_filt;                 // (deg/s) filtered wheel angular velocity
 } enc_t;
 
 
 /* Function prototypes */
-void Enc_init(volatile enc_t * enc);
-void Enc_update(volatile enc_t * enc);
-void Enc_calcAngle(volatile enc_t * enc);
+void Enc_init(enc_t * enc);
+void Enc_update(enc_t * enc);
+void Enc_calcAngle(enc_t * enc);
 
 
 #endif /* ENC_H_ */

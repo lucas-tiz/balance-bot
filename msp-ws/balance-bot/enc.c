@@ -20,7 +20,7 @@
 #include "enc.h"
 
 
-void Enc_init(volatile enc_t * enc) {
+void Enc_init(enc_t * enc) {
     /* Initialize encoder based on current channel states */
     int i; // channel index
 //    int pins_or; // bitwise OR of all encoder pins
@@ -46,7 +46,7 @@ void Enc_init(volatile enc_t * enc) {
 }
 
 
-void Enc_update(volatile enc_t * enc) {
+void Enc_update(enc_t * enc) {
     /* encoder interrupt routine: determine which channel of encoder(s) caused interrupt, change encoder counts accordingly */
 //    uint_fast16_t status = MAP_GPIO_getEnab00InterruptStatus(GPIO_PORT_P3); // get port 3 interrupt status
 //
@@ -135,7 +135,7 @@ void Enc_update(volatile enc_t * enc) {
 }
 
 
-void Enc_calcAngle(volatile enc_t * enc) {
+void Enc_calcAngle(enc_t * enc) {
     /* convert encoder counts to angle, differentiate angle, filter angular velocity  */
     static const float lpfCoeffs[ENC_LPF_ORDER+1] = {-0.00081606,-0.00348667,
         -0.00846865,-0.01369406,-0.01349162,0.00002764,0.03264918,0.08284379,
