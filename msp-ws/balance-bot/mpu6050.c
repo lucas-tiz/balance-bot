@@ -23,7 +23,8 @@
 
 void IMU_init(volatile imu_t * imu, int cutoff_dlpf, int range_gyro, int range_accel) {
     /* Initialize MPU6050 IMU */
-    I2Cc_write(IMU_ADDR, IMU_REG_PWR_MGMT1, 0x03); // disable sleep, set clock source to z-axis gyroscope reference
+    I2Cc_write(IMU_ADDR, IMU_REG_PWR_MGMT1, 0x03); // disable sleep,
+        // set clock source to z-axis gyroscope reference
 
     // set DLPF cutoff (0x00=260, 0x01=184, 0x02=94, 0x03=44, 0x04=21, 0x05=10, 0x06=5)
     uint8_t reg_dlpf;
@@ -45,7 +46,7 @@ void IMU_init(volatile imu_t * imu, int cutoff_dlpf, int range_gyro, int range_a
     }
     I2Cc_write(IMU_ADDR, IMU_REG_CONFIG, reg_dlpf);
 
-    // set full scale range of gyro (0x00=250, 0x08=500, 0x10=1000, 0x18=2000)
+    // set full-scale range of gyro (0x00=250, 0x08=500, 0x10=1000, 0x18=2000)
     uint8_t reg_gyro;
     switch (range_gyro) {
         case 250:
@@ -120,11 +121,11 @@ void IMU_calcAngleAccel(volatile float * accel, volatile float * angle) {
 }
 
 
-void IMU_calcAngleFused(volatile imu_t * imu) {
+void IMU_calcAngleFused(volatile imu_t * imu, float period_sense) {
     /* Calculate orientation based on IMU data */
     //TODO: implement yaw, roll later if necessary
 
-    IMU_calcAngleGyro(imu->raw.ang_vel, imu->angle.gyro, 1/IMU_CALC_FREQ); // calculate angles from gyro data
+    IMU_calcAngleGyro(imu->raw.ang_vel, imu->angle.gyro, period_sense); // calculate angles from gyro data
     IMU_calcAngleAccel(imu->raw.accel, imu->angle.accel);       // calculate angles from acceleration data
 
     // correct drift of gyro
@@ -137,44 +138,47 @@ void IMU_calcAngleFused(volatile imu_t * imu) {
     imu->angle.fused[0][0] = 0.90*imu->angle.gyro[0] + 0.10*imu->angle.accel[0]; // calculate complementary filtered pitch
 
     // calculate angular velocity
-    imu->ang_vel.fused[0] = (imu->angle.fused[0][0] - imu->angle.fused[0][1])*IMU_CALC_FREQ;
+    imu->ang_vel.fused[0] = (imu->angle.fused[0][0] - imu->angle.fused[0][1])/period_sense;
 }
 
 
-void IMU_calibrate(volatile imu_t * imu, int delay_cycle) {
+void IMU_calibrate(volatile imu_t * imu, const int n_cycles, const int delay) {
     /* Initialize gyro values based on accelerometer values: must be stationary */
-    float ang_vel_cal[IMU_CAL_CYCLES][3];  // initialize data array of angular velocities
-    float accel_cal[IMU_CAL_CYCLES][3];   // initialize data array of accelerations
+    int axis;
 
-    int counts_cal; // zero calibration count
-    int axis; // coordinate frame axis
+    // reset calibration values
+    for (axis = 0; axis < 3; axis++) {
+        imu->cal.ang_vel_offset[axis] = 0.0f;
+    }
+
+    // sum values over multiple cycles
+    float ang_vel_sum[3] = {0,0,0};
+    float accel_sum[3] = {0,0,0};
+    int idx_cycle;
     int i;
-    for (counts_cal = 0; counts_cal < IMU_CAL_CYCLES; counts_cal++) {
-        IMU_readVals(imu); // read angular velocities and accelerations
+    for (idx_cycle = 0; idx_cycle < n_cycles; idx_cycle++) {
+        IMU_readVals(imu); // read angular vel/accel
         for (axis = 0; axis < 3; axis++) {
-            ang_vel_cal[counts_cal][axis] = imu->raw.ang_vel[axis];    // record ang vel data
-            accel_cal[counts_cal][axis] = imu->raw.accel[axis];  // record accel data
+            ang_vel_sum[axis] += imu->raw.ang_vel[axis];
+            accel_sum[axis] += imu->raw.accel[axis];
         }
-        for (i = 0; i < delay_cycle; i++); // delay
+        for (i = 0; i < delay; i++); // delay
     }
 
     // calculate average value for each axis of accelerometer and gyro
-    float ang_vel_cal_avg[3] = {0,0,0};
-    float accel_cal_avg[3] = {0,0,0};
-    for(axis = 0; axis < 3; axis++) {
-        for (counts_cal = 0; counts_cal < IMU_CAL_CYCLES; counts_cal++) {
-            ang_vel_cal_avg[axis] = ang_vel_cal_avg[axis] + ang_vel_cal[counts_cal][axis];
-            accel_cal_avg[axis] = accel_cal_avg[axis] + accel_cal[counts_cal][axis];
-        }
+    float ang_vel_avg[3] = {0,0,0};
+    float accel_avg[3] = {0,0,0};
+    for (axis = 0; axis < 3; axis++) {
+        ang_vel_avg[axis] = ang_vel_sum[axis]/(float)n_cycles;
+        imu->cal.ang_vel_offset[axis] = ang_vel_avg[axis];
 
-        ang_vel_cal_avg[axis] = ang_vel_cal_avg[axis]/(float)IMU_CAL_CYCLES; // calculate average angular velocity
-        imu->cal.ang_vel_offset[axis] = ang_vel_cal_avg[axis]; // set gyro ang vel offset to average
-        accel_cal_avg[axis] = accel_cal_avg[axis]/(float)IMU_CAL_CYCLES; // calculate average accelerations
+        accel_avg[axis] = accel_sum[axis]/(float)n_cycles;
     }
     float angles[3];
-    IMU_calcAngleAccel(accel_cal_avg, angles); // calculate orientation from average accelerations
+    IMU_calcAngleAccel(accel_avg, angles);
 
-    imu->angle.gyro[0] = angles[0]; // zero gyro pitch based on accelerometer
-    imu->angle.gyro[2] = angles[2]; // zero gyro roll based on accelerometer
+    imu->angle.gyro[0] = angles[0]; // set gyro pitch based on accelerometer
+    imu->angle.gyro[1] = 0.0f; // don't know this
+    imu->angle.gyro[2] = angles[2]; // set gyro roll based on accelerometer
 }
 

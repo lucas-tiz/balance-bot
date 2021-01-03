@@ -18,9 +18,9 @@
 
 
 /* Macros */
-#define IMU_GYRO_THRESHOLD 0.0          // (deg/s) gyro rotation threshold
-#define IMU_CAL_CYCLES 200          // number of calibration cycles over which to record data
-#define IMU_CALC_FREQ 100.0       // (Hz) frequency of IMU position calculations
+#define IMU_CAL_CYCLES 200
+
+#define IMU_GYRO_THRESHOLD 0.0      // (deg/s) gyro rotation threshold
 
 #define IMU_GYRO_SENS_250 131.07    // (bits/deg/s) +/-250 deg/s gyro sensitivity
 #define IMU_GYRO_SENS_500 65.54     // (bits/deg/s) +/-500 deg/s gyro sensitivity
@@ -72,8 +72,8 @@ void IMU_init(volatile imu_t * imu, int cutoff_dlpf, int range_gyro, int range_a
 void IMU_readVals(volatile imu_t * imu);
 void IMU_calcAngleGyro(volatile float * ang_vel, volatile float * angle, float t_integ);
 void IMU_calcAngleAccel(volatile float* accel, volatile float* angle);
-void IMU_calcAngleFused(volatile imu_t * imu);
-void IMU_calibrate(volatile imu_t * imu, int delay_cycle);
+void IMU_calcAngleFused(volatile imu_t * imu, float period_sense);
+void IMU_calibrate(volatile imu_t * imu, const int cycles, const int delay);
 void IMU_selfTest(void);
 
 
