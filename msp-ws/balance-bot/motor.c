@@ -13,7 +13,7 @@
 #include "motor.h"
 
 
-void Motor_velUpdate(motor_t * motor, float vel_motor) {
+void Motor_velUpdate(motor_t * motor, float vel_motor, int period_motor) {
     /* Motor velocity controller: PID */
     float err = vel_motor - motor->pid_vel.vel_des;
     motor->pid_vel.err_int += err;
@@ -54,7 +54,7 @@ void Motor_velUpdate(motor_t * motor, float vel_motor) {
     }
 
     // set duty cycle depending on motor direction
-    int duty = (int)(MOTOR_PERIOD*(u/100.0)); // calculate motor PWM timer duty cycle
+    int duty = (int)(period_motor*(u/100.0)); // calculate motor PWM timer duty cycle
 
     if (duty >= 0) { // if duty cycle is positive, go forward
         *(motor->reg_duty.back) = 0;  // set backward PWM signal to zero

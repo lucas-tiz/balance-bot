@@ -20,9 +20,6 @@
 #include <stdint.h>
 
 
-#define MOTOR_PERIOD 48E+6/4/1000 // motor PWM timer period
-
-
 //* Data types */
 typedef struct {
 //    const uint8_t pins[2]; // motor pins (0=forward, 1=backward)
@@ -46,7 +43,7 @@ typedef struct {
 
 
 /* Function prototypes */
-void Motor_velUpdate(motor_t * motor, float vel_motor);
+void Motor_velUpdate(motor_t * motor, float vel_motor, int period_motor);
 
 
 #endif /* MOTOR_H_ */
